@@ -1,0 +1,41 @@
+// Source code is decompiled from a .class file using FernFlower decompiler.
+public class nth_from_end {
+   public nth_from_end() {
+   }
+
+   public static nth_from_end$Node nth_end(nth_from_end$Node var0, int var1) {
+      nth_from_end$Node var2 = var0;
+      nth_from_end$Node var3 = var0;
+
+      for(int var4 = 0; var4 < var1; ++var4) {
+         var3 = var3.next;
+      }
+
+      while(var3.next != null) {
+         var2 = var2.next;
+         var3 = var3.next;
+      }
+
+      var2.next = var2.next.next;
+      return var0;
+   }
+
+   public static void main(String[] var0) {
+      nth_from_end$Node var1 = new nth_from_end$Node(100);
+      nth_from_end$Node var2 = new nth_from_end$Node(11);
+      nth_from_end$Node var3 = new nth_from_end$Node(32);
+      nth_from_end$Node var4 = new nth_from_end$Node(78);
+      nth_from_end$Node var5 = new nth_from_end$Node(450);
+      nth_from_end$Node var6 = new nth_from_end$Node(34);
+      var1.next = var2;
+      var2.next = var3;
+      var3.next = var4;
+      var4.next = var5;
+      var5.next = var6;
+
+      for(nth_from_end$Node var7 = nth_end(var1, 5); var7 != null; var7 = var7.next) {
+         System.out.print(var7.data + " ");
+      }
+
+   }
+}

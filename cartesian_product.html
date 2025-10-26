@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cartesian Product Calculation with Forecast and Graph</title>
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    h2 {
+      text-align: center;
+    }
+    #mainContainer {
+      display: flex;
+      flex: 1;
+      gap: 30px;
+      margin-top: 20px;
+    }
+    #leftSide {
+      flex: 1;
+      max-width: 500px;
+      overflow-y: auto;
+    }
+    #rightSide {
+      flex: 1;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-y: auto;
+    }
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      text-align: center;
+      padding: 5px;
+      font-size: 14px;
+    }
+    input[type="number"] {
+      width: 70px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+    #inputContainer > div {
+      margin-bottom: 15px;
+    }
+    #predictedResult {
+      margin-top: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #2a5d84;
+      border: 2px solid #2a5d84;
+      padding: 15px 25px;
+      border-radius: 10px;
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+      word-wrap: break-word;
+      align-self: center;
+    }
+    button {
+      cursor: pointer;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    label {
+      font-weight: bold;
+    }
+    canvas {
+      max-width: 100%;
+      max-height: 400px;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    #resultTable, #correlationResult {
+      width: 100%;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Cartesian Product Calculator with Forecast and Graph</h2>
+
+  <div id="mainContainer">
+    <!-- LEFT SIDE: Inputs and Results (except prediction) -->
+    <div id="leftSide">
+      <label for="lengthInput">Enter number of elements (n): </label>
+      <input type="number" id="lengthInput" min="1" /><br><br>
+      <button onclick="generateInputs()">Generate Input Fields</button>
+
+      <div id="inputContainer" style="margin-top: 20px;"></div>
+
+      <button id="calculateBtn" onclick="calculate()" style="display:none; margin-top: 10px;">Calculate</button>
+
+      <div id="resultTable" style="margin-top: 20px;"></div>
+      <div id="correlationResult" style="margin-top: 20px; font-weight: bold;"></div>
+    </div>
+
+    <!-- RIGHT SIDE: Graph + Predicted Result only -->
+    <div id="rightSide">
+      <canvas id="scatterChart"></canvas>
+      <div id="predictedResult"></div>
+    </div>
+  </div>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <script>
+    let chart;
+    let m_slope, b_intercept;
+
+    function generateInputs() {
+      const n = parseInt(document.getElementById('lengthInput').value);
+      if (!n || n <= 0) {
+        alert('Please enter a positive integer.');
+        return;
+      }
+      const container = document.getElementById('inputContainer');
+      container.innerHTML = '';
+
+      const xDiv = document.createElement('div');
+      xDiv.innerHTML = '<h3>Input X values:</h3>';
+      for (let i = 0; i < n; i++) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = 'x_' + i;
+        input.placeholder = `x[${i}]`;
+        xDiv.appendChild(input);
+      }
+
+      const yDiv = document.createElement('div');
+      yDiv.innerHTML = '<h3>Input Y values:</h3>';
+      for (let i = 0; i < n; i++) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = 'y_' + i;
+        input.placeholder = `y[${i}]`;
+        yDiv.appendChild(input);
+      }
+
+      container.appendChild(xDiv);
+      container.appendChild(yDiv);
+
+      document.getElementById('calculateBtn').style.display = 'inline-block';
+      document.getElementById('resultTable').innerHTML = '';
+      document.getElementById('correlationResult').innerHTML = '';
+      document.getElementById('predictedResult').innerHTML = '';
+
+      if(chart){
+        chart.destroy();
+        chart = null;
+      }
+    }
+
+    function calculate() {
+      const n = parseInt(document.getElementById('lengthInput').value);
+      let x = [], y = [];
+
+      for (let i = 0; i < n; i++) {
+        const xVal = parseFloat(document.getElementById('x_' + i).value);
+        const yVal = parseFloat(document.getElementById('y_' + i).value);
+        if (isNaN(xVal) || isNaN(yVal)) {
+          alert('Please enter valid numbers for all X and Y inputs.');
+          return;
+        }
+        x.push(xVal);
+        y.push(yVal);
+      }
+
+      let sum_x = x.reduce((a,b) => a + b, 0);
+      let sum_y = y.reduce((a,b) => a + b, 0);
+      let mean_x = sum_x / n;
+      let mean_y = sum_y / n;
+
+      let sum_xsquare = 0, sum_ysquare = 0, sum_product_xy = 0;
+      let sum_dev_x_sq = 0, sum_dev_y_sq = 0;
+
+      let html = `<table>
+        <thead>
+          <tr>
+            <th>X</th><th>Y</th><th>X²</th><th>Y²</th><th>XY</th>
+            <th>(X - Mean(X))²</th><th>(Y - Mean(Y))²</th>
+          </tr>
+        </thead><tbody>`;
+
+      for (let i = 0; i < n; i++) {
+        const xSq = x[i] ** 2;
+        const ySq = y[i] ** 2;
+        const xy = x[i] * y[i];
+        const dev_x_sq = (x[i] - mean_x) ** 2;
+        const dev_y_sq = (y[i] - mean_y) ** 2;
+
+        sum_xsquare += xSq;
+        sum_ysquare += ySq;
+        sum_product_xy += xy;
+        sum_dev_x_sq += dev_x_sq;
+        sum_dev_y_sq += dev_y_sq;
+
+        html += `<tr>
+          <td>${x[i]}</td><td>${y[i]}</td>
+          <td>${xSq.toFixed(4)}</td><td>${ySq.toFixed(4)}</td>
+          <td>${xy.toFixed(4)}</td>
+          <td>${dev_x_sq.toFixed(4)}</td><td>${dev_y_sq.toFixed(4)}</td>
+        </tr>`;
+      }
+
+      html += `<tr style="font-weight:bold;">
+        <td>Sum</td><td></td>
+        <td>${sum_xsquare.toFixed(4)}</td><td>${sum_ysquare.toFixed(4)}</td>
+        <td>${sum_product_xy.toFixed(4)}</td>
+        <td>${sum_dev_x_sq.toFixed(4)}</td><td>${sum_dev_y_sq.toFixed(4)}</td>
+      </tr></tbody></table>`;
+
+      document.getElementById('resultTable').innerHTML = html;
+
+      const numerator = n * sum_product_xy - sum_x * sum_y;
+      const denominatorX = n * sum_xsquare - sum_x ** 2;
+      const denominatorY = n * sum_ysquare - sum_y ** 2;
+
+      let r = (denominatorX <= 0 || denominatorY <= 0)
+        ? 'Undefined'
+        : (numerator / Math.sqrt(denominatorX * denominatorY));
+      let rSquared = (typeof r === 'string') ? 'Undefined' : (r * r).toFixed(6);
+
+      let Sx = Math.sqrt(sum_dev_x_sq / (n - 1));
+      let Sy = Math.sqrt(sum_dev_y_sq / (n - 1));
+
+      let correlationText =
+        `Correlation Coefficient (R) = ${typeof r === 'string' ? r : r.toFixed(6)}<br>` +
+        `Coefficient of Determination (R²) = ${rSquared}<br>` +
+        `Sample standard deviation Sx = ${Sx.toFixed(6)}<br>` +
+        `Sample standard deviation Sy = ${Sy.toFixed(6)}`;
+
+      if (typeof r !== 'string') {
+        m_slope = r * Sy / Sx;
+        b_intercept = mean_y - m_slope * mean_x;
+
+        correlationText +=
+          `<br>Slope (m) = ${m_slope.toFixed(6)}<br>` +
+          `Intercept (b) = ${b_intercept.toFixed(6)} (i.e., Mean(Y) - m * Mean(X))`;
+      }
+
+      document.getElementById('correlationResult').innerHTML = correlationText;
+
+      if (typeof r !== 'string') {
+        let forecastX = prompt("Enter the value of X to forecast Y:");
+        if (forecastX === null) {
+          document.getElementById('predictedResult').innerHTML = '';
+          drawChart(x, y, null);
+          return;
+        }
+        forecastX = parseFloat(forecastX);
+        if (isNaN(forecastX)) {
+          alert("Invalid number entered for X.");
+          document.getElementById('predictedResult').innerHTML = '';
+          drawChart(x, y, null);
+          return;
+        }
+
+        const predictedY = m_slope * forecastX + b_intercept;
+        document.getElementById('predictedResult').innerHTML =
+          `Predicted Y for X = ${forecastX} is:<br><span style="font-size: 36px; color: #b03030;">${predictedY.toFixed(6)}</span>`;
+
+        drawChart(x, y, { x: forecastX, y: predictedY });
+      } else {
+        document.getElementById('predictedResult').innerHTML = '';
+        drawChart(x, y, null);
+      }
+    }
+
+    function drawChart(xArr, yArr, predictedPoint) {
+      const scatterData = xArr.map((xi, idx) => ({ x: xi, y: yArr[idx] }));
+      const minX = Math.min(...xArr);
+      const maxX = Math.max(...xArr);
+      const linePoints = [
+        { x: minX, y: m_slope * minX + b_intercept },
+        { x: maxX, y: m_slope * maxX + b_intercept }
+      ];
+
+      const datasets = [
+        {
+          label: 'Data Points',
+          data: scatterData,
+          backgroundColor: 'blue',
+          pointRadius: 6,
+          type: 'scatter'
+        },
+        {
+          label: 'Regression Line',
+          data: linePoints,
+          borderColor: 'green',
+          borderWidth: 2,
+          fill: false,
+          type: 'line',
+          pointRadius: 0
+        }
+      ];
+
+      if(predictedPoint) {
+        datasets.push({
+          label: 'Predicted X Line',
+          data: [
+            { x: predictedPoint.x, y: 0 },
+            { x: predictedPoint.x, y: predictedPoint.y }
+          ],
+          borderColor: 'red',
+          borderDash: [10,5],
+          borderWidth: 2,
+          fill: false,
+          type: 'line'
+        });
+        datasets.push({
+          label: 'Predicted Point',
+          data: [predictedPoint],
+          backgroundColor: 'red',
+          pointRadius: 8,
+          type: 'scatter'
+        });
+      }
+
+      const ctx = document.getElementById('scatterChart').getContext('2d');
+      if(chart){ chart.destroy(); }
+
+      chart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { title: { display: true, text: 'X' } },
+            y: { title: { display: true, text: 'Y' } }
+          },
+          plugins: {
+            legend: { position: 'top' }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
