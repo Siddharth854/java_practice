@@ -1,6 +1,6 @@
 /*
 Given a sequence of number Remove all the consecutive subsequence of length greater than or equal to 2 that contains the same element.
- */
+*/
 import java.util.Stack;
 public class Remove_Consecutive_Subsequence
 {
